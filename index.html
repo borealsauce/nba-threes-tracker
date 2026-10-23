@@ -1,0 +1,151 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>NBA Threes Tracker</title>
+<style>
+:root{--bg:#0b0f17;--card:#141b27;--line:#253044;--tx:#e6edf6;--mut:#8a97ab;--acc:#3ea6ff;--grn:#3ccf7a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+h1{font-size:17px;margin:0;flex:1}button,select{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:14px;cursor:pointer}
+main{max-width:1100px;margin:auto;padding:14px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:18px 4px 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.gc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.gc:hover{border-color:var(--acc)}
+.tr{display:flex;align-items:center;gap:8px;margin:4px 0}.tr img{width:26px;height:26px}.tr .n{flex:1;font-weight:600}.tr .s{font-size:20px;font-weight:700}
+.st{font-size:12px;color:var(--mut);margin-top:6px}.live{color:#ff5a5a;font-weight:700}
+.sb{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.tm{display:flex;align-items:center;gap:10px}.tm img{width:44px;height:44px}.tm .s{font-size:30px;font-weight:800}.mid{text-align:center;color:var(--mut)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}.tm .s{font-size:24px}.tm img{width:32px;height:32px}}
+.pan{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}.tot{font-size:22px;font-weight:800;margin:2px 0 8px}.tot small{font-size:13px;color:var(--mut);font-weight:400}
+table{width:100%;border-collapse:collapse}th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;user-select:none}td.hit{color:var(--grn);font-weight:700}
+#gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9}#gate input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;width:160px}
+.note{color:var(--mut);font-size:12px;margin:10px 4px}
+</style></head><body>
+<div id="gate"><form onsubmit="return unlock()"><input id="pw" type="password" inputmode="numeric" placeholder="Password" autofocus> <button>Open</button><div id="gerr" class="note"></div></form></div>
+<header><button id="back" hidden onclick="go(null)">‹ Games</button><h1>🏀 NBA Threes Tracker</h1><select id="team" title="Jump to team's game"></select></header>
+<main id="app"><div class="note">Loading…</div></main>
+<script>
+const H='37d2c05e6320b12b5d1cb3c43a154becd490688ff68ba9c79e95edc1e5534440',SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',SU='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=';
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function unlock(){if(await sha(document.getElementById('pw').value)===H){localStorage.nbaok=H;document.getElementById('gate').remove();start()}else document.getElementById('gerr').textContent='Wrong password';return false}
+if(localStorage.nbaok===H){document.getElementById('gate').remove();addEventListener('DOMContentLoaded',start)}
+const app=document.getElementById('app');let timer,events=[];
+const pt=d=>new Date(d).toLocaleString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',hour:'numeric',minute:'2-digit'})+' PT';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function params(){return new URLSearchParams(location.search)}
+function go(id){const u=new URL(location);u.search=id?'?game='+id:'';history.pushState(null,'',u);route()}
+addEventListener('popstate',route);
+async function j(u){const r=await fetch(u+(u.includes('?')?'&':'?')+'_='+Date.now());if(!r.ok)throw Error(r.status);return r.json()}
+async function start(){route()}
+async function loadSB(){const d=await j(SB);events=d.events||[];
+ const sel=document.getElementById('team'),teams=[];events.forEach(e=>e.competitions[0].competitors.forEach(c=>teams.push([c.team.abbreviation,c.team.displayName,e.id])));
+ teams.sort((a,b)=>a[1].localeCompare(b[1]));sel.innerHTML='<option value="">Team…</option>'+teams.map(t=>'<option value="'+t[2]+'">'+esc(t[1])+'</option>').join('');
+ sel.onchange=()=>sel.value&&go(sel.value);return d}
+async function route(){clearTimeout(timer);const p=params();let id=p.get('game');
+ if(!events.length)try{await loadSB()}catch(e){app.innerHTML='<div class="note">Could not load scoreboard: '+e+'</div>';timer=setTimeout(route,20000);return}
+ const tm=p.get('team');if(!id&&tm){const e=events.find(e=>e.competitions[0].competitors.some(c=>c.team.abbreviation.toUpperCase()===tm.toUpperCase()));if(e)id=e.id}
+ document.getElementById('back').hidden=!id;id?gameView(id):listView()}
+function card(e){const c=e.competitions[0],st=e.status.type,a=c.competitors.find(x=>x.homeAway=='away'),h=c.competitors.find(x=>x.homeAway=='home');
+ const row=t=>'<div class="tr"><img src="'+t.team.logo+'" alt=""><span class="n">'+esc(t.team.displayName)+'</span><span class="s">'+(st.state=='pre'?'':t.score)+'</span></div>';
+ const s=st.state=='in'?'<span class="live">● LIVE</span> '+esc(st.detail):st.state=='pre'?'Tip '+pt(e.date):esc(st.detail);
+ return '<div class="gc" onclick="go(\''+e.id+'\')">'+row(a)+row(h)+'<div class="st">'+s+'</div></div>'}
+async function listView(){try{await loadSB()}catch(e){}
+ const L=events.filter(e=>e.status.type.state=='in'),U=events.filter(e=>e.status.type.state=='pre'),F=events.filter(e=>e.status.type.state=='post');
+ let h='<h2>Live now ('+L.length+')</h2>'+(L.length?'<div class="grid">'+L.map(card).join('')+'</div>':'<div class="note">No games live right now.</div>');
+ if(U.length)h+='<h2>Upcoming</h2><div class="grid">'+U.map(card).join('')+'</div>';if(F.length)h+='<h2>Final</h2><div class="grid">'+F.map(card).join('')+'</div>';
+ app.innerHTML=h+'<div class="note">Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles'})+' PT · refreshes every 20s · data: ESPN</div>';timer=setTimeout(listView,20000)}
+function onCourt(d){// starters + substitution plays; per team
+ const on={};(d.boxscore.players||[]).forEach(t=>{on[t.team.id]=new Set(t.statistics[0].athletes.filter(a=>a.starter).map(a=>a.athlete.id))});
+ const plays=d.plays||[];let per=0;const seen={};
+ for(const p of plays){if(p.period&&p.period.number!==per){per=p.period.number}
+  const tid=p.team&&p.team.id;if(!tid||!on[tid])continue;const ps=(p.participants||[]).map(x=>x.athlete.id);
+  if(p.type&&p.type.text==='Substitution'&&ps.length>=2){on[tid].delete(ps[1]);on[tid].add(ps[0])}
+  else if(ps[0]&&!/Technical|Ejection/i.test(p.type&&p.type.text||'')){seen[ps[0]]=[tid,p.sequenceNumber|0];
+   if(!on[tid].has(ps[0])&&on[tid].size<5)on[tid].add(ps[0])}}
+ return on}
+function sortState(){return window._sort||{}}
+async function gameView(id){let d;try{d=await j(SU+id)}catch(e){app.innerHTML='<div class="note">Could not load game '+esc(id)+': '+e+'</div>';timer=setTimeout(()=>gameView(id),20000);return}
+ if(params().get('game')!==id&&!params().get('team'))return;
+ const comp=d.header.competitions[0],st=comp.status.type,state=st.state,cs=comp.competitors,a=cs.find(x=>x.homeAway=='away'),h=cs.find(x=>x.homeAway=='home');
+ const box={};(d.boxscore.players||[]).forEach(t=>box[t.team.id]=t);const on=state=='in'?onCourt(d):null;
+ const tmHTML=t=>'<div class="tm"><img src="'+(t.team.logos?t.team.logos[0].href:t.team.logo)+'" alt=""><div><div style="font-weight:700">'+esc(t.team.abbreviation)+'</div><div class="s">'+(state=='pre'?'–':t.score)+'</div></div></div>';
+ const mid=state=='in'?'<span class="live">● LIVE</span><br>'+esc(st.detail):state=='pre'?'Tip-off<br>'+pt(comp.date):esc(st.detail);
+ let html='<div class="sb">'+tmHTML(a)+'<div class="mid">'+mid+'</div>'+tmHTML(h)+'</div><div class="cols">';
+ for(const t of [a,h]){const b=box[t.team.id];let rows=[],tm=0,ta=0;
+  if(b){const s=b.statistics[0],i=s.names.indexOf('3PT'),mi=s.names.indexOf('MIN');
+   for(const x of s.athletes){const v=(x.stats&&x.stats[i])||'0-0',[m,at]=v.split('-').map(Number);tm+=m||0;ta+=at||0;
+    const show=state=='in'?on[t.team.id].has(x.athlete.id):state=='post'?at>0:true;
+    if(show)rows.push({n:x.athlete.shortName||x.athlete.displayName,j:x.athlete.jersey||'',m:m||0,a:at||0,p:at?Math.round(m/at*1000)/10:null,st:x.starter})}}
+  const lbl=state=='in'?'On court':state=='post'?'Players who shot threes':'Roster'+(rows.some(r=>r.st)?' (starters first)':'');
+  if(state=='pre')rows.sort((x,y)=>(y.st-x.st));
+  html+='<div class="pan"><div style="font-weight:700">'+esc(t.team.displayName)+'</div><div class="tot">'+tm+'-'+ta+' <small>team 3PT'+(ta?' · '+(tm/ta*100).toFixed(1)+'%':'')+'</small></div>'+
+  '<div class="note" style="margin:0 0 4px">'+lbl+'</div><table class="sortable"><thead><tr><th>Player</th><th>#</th><th>3PM</th><th>3PA</th><th>3P%</th></tr></thead><tbody>'+
+  (rows.length?rows.map(r=>'<tr><td>'+esc(r.n)+(state=='pre'&&r.st?' ★':'')+'</td><td>'+esc(r.j)+'</td><td class="'+(r.m?'hit':'')+'">'+r.m+'</td><td>'+r.a+'</td><td>'+(r.p==null?'–':r.p.toFixed(1))+'</td></tr>').join(''):'<tr><td colspan="5" style="text-align:center;color:var(--mut)">'+(state=='pre'?'Lineups post near tip-off':'—')+'</td></tr>')+'</tbody></table></div>'}
+ html+='</div><div class="note">Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles'})+' PT · '+(state=='post'?'final':'refreshes every 15s')+' · on-court players derived from starters + ESPN substitution plays · data: ESPN</div>';
+ const keep=[...app.querySelectorAll('table')].map(t=>{const th=t.querySelector('th[data-sdir]');return th?[th.cellIndex,th.dataset.sdir]:null});app.innerHTML=html;app.querySelectorAll('table').forEach((t,i)=>{const k=keep[i];if(!k)return;const th=t.rows[0].cells[k[0]];th.click();if(k[1]==='desc')th.click()});
+ if(state!='post')timer=setTimeout(()=>gameView(id),15000)}
+</script><!--SORTABLE-START--><script>
+/* Shared sortable tables (Grok Bot trackers). Click any header: asc/desc toggle with ▲/▼.
+   Works on dynamically rendered tables via event delegation. Totals (tfoot, .total/.ft/.tot rows,
+   or first cell TOTAL/ALL-TIME/GRAND) stay pinned at bottom. Group-label rows (fewer cells / colspan)
+   keep their members: sorting happens within each group. Uses td[data-v] when present.
+   Skip: th with own onclick, th.nosort, or table[data-nosort]. */
+(function(){
+  if(window.__sortableShared)return;window.__sortableShared=1;
+  var st=document.createElement('style');
+  st.textContent='table:not([data-nosort]) th:not(.nosort){cursor:pointer;user-select:none}th .srt-ar{font-size:.8em;opacity:.85;margin-left:3px}';
+  (document.head||document.documentElement).appendChild(st);
+  var MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  function key(cell){
+    if(!cell)return null;
+    var raw=cell.dataset&&cell.dataset.v!=null?cell.dataset.v:cell.textContent;
+    var s=String(raw).replace(/[▲▼]/g,'').trim();
+    if(!s||s==='—'||s==='-'||s==='–'||/^n\/?a$/i.test(s))return null;
+    var m;
+    if((m=s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/)))return {n:Date.UTC(+m[1],+m[2]-1,+(m[3]||1))};
+    if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))){var y=+m[3];if(y<100)y+=2000;return {n:Date.UTC(y,+m[1]-1,+m[2])};}
+    if((m=s.match(/^([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})$/))&&MON[m[1].toLowerCase()])return {n:Date.UTC(+m[3],MON[m[1].toLowerCase()]-1,+m[2])};
+    if((m=s.match(/^([A-Za-z]{3})[a-z]* (\d{4})$/))&&MON[m[1].toLowerCase()])return {n:Date.UTC(+m[2],MON[m[1].toLowerCase()]-1,1)};
+    if((m=s.match(/^Q([1-4]) (\d{4})$/i)))return {n:Date.UTC(+m[2],(+m[1]-1)*3,1)};
+    var t=s.replace(/[$,%x×\s]|USD/gi,'').replace(/^\+/,'').replace(/[−–]/g,'-');
+    var neg=/^\(.*\)$/.test(t);if(neg)t=t.slice(1,-1);
+    var mult=1;if((m=t.match(/^(-?[\d.]+)([KMB])$/i))){t=m[1];mult={k:1e3,m:1e6,b:1e9}[m[2].toLowerCase()];}
+    if(/^-?\d*\.?\d+$/.test(t))return {n:parseFloat(t)*mult*(neg?-1:1)};
+    return {s:s.toLowerCase()};
+  }
+  function pinned(r){
+    if(r.parentElement&&r.parentElement.tagName==='TFOOT')return true;
+    if(/(^|\s)(total|totals|ft|tot|sum|grand|pinned)(\s|$)/i.test(r.className))return true;
+    var c=r.cells[0];return !!c&&/^\s*(TOTAL|TOTALS|ALL-TIME|GRAND TOTAL)\b/i.test(c.textContent);
+  }
+  document.addEventListener('click',function(e){
+    var th=e.target.closest&&e.target.closest('th');if(!th||th.onclick||th.classList.contains('nosort'))return;
+    var tb=th.closest('table');if(!tb||tb.hasAttribute('data-nosort'))return;
+    var hr=th.parentElement;if(hr.parentElement.tagName==='TFOOT')return;
+    var ci=0;for(var k=0;k<hr.cells.length&&hr.cells[k]!==th;k++)ci+=hr.cells[k].colSpan||1;
+    var ncol=0;for(k=0;k<hr.cells.length;k++)ncol+=hr.cells[k].colSpan||1;
+    var dir=th.dataset.sdir==='asc'?'desc':'asc',m=dir==='asc'?1:-1;
+    tb.querySelectorAll('th').forEach(function(x){delete x.dataset.sdir;var a=x.querySelector('.srt-ar');if(a)a.remove();});
+    th.dataset.sdir=dir;var ar=document.createElement('span');ar.className='srt-ar';ar.textContent=dir==='asc'?'▲':'▼';th.appendChild(ar);
+    var bodies=tb.tBodies.length?[].slice.call(tb.tBodies):[tb];
+    bodies.forEach(function(body){
+      var all=[].slice.call(body.rows).filter(function(r){return r!==hr&&!(r.cells.length&&r.cells[0].tagName==='TH'&&!r.querySelector('td'));});
+      var pins=[],groups=[{head:null,rows:[]}];
+      all.forEach(function(r){
+        if(pinned(r)){pins.push(r);return;}
+        var w=0;for(var j=0;j<r.cells.length;j++)w+=r.cells[j].colSpan||1;
+        if(r.cells.length===1&&ncol>1)groups.push({head:r,rows:[]});else groups[groups.length-1].rows.push(r);
+      });
+      function cellAt(r){var x=0;for(var j=0;j<r.cells.length;j++){if(x===ci)return r.cells[j];x+=r.cells[j].colSpan||1;}return null;}
+      groups.forEach(function(g){
+        g.rows.sort(function(a,b){var A=key(cellAt(a)),B=key(cellAt(b));
+          if(!A&&!B)return 0;if(!A)return 1;if(!B)return -1;
+          if(A.n!=null&&B.n!=null)return (A.n-B.n)*m;
+          return String(A.s!=null?A.s:A.n).localeCompare(String(B.s!=null?B.s:B.n),undefined,{numeric:true})*m;});
+        if(g.head)body.appendChild(g.head);g.rows.forEach(function(r){body.appendChild(r);});
+      });
+      pins.forEach(function(r){body.appendChild(r);});
+    });
+  },false);
+})();
+
+</script><!--SORTABLE-END-->
+</body></html>
