@@ -8,25 +8,24 @@ h1{font-size:17px;margin:0;flex:1}button,select{background:var(--card);color:var
 main{max-width:1100px;margin:auto;padding:14px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:18px 4px 8px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .gc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.gc:hover{border-color:var(--acc)}
-.tr{display:flex;align-items:center;gap:8px;margin:4px 0}.tr img{width:26px;height:26px}.tr .n{flex:1;font-weight:600}.tr .s{font-size:20px;font-weight:700}
+.tr{display:flex;align-items:center;gap:8px;margin:4px 0}.tr img{width:34px;height:34px}.tr .n{flex:1;font-weight:600;font-size:17px}.tr .s{font-size:34px;font-weight:800}
 .st{font-size:12px;color:var(--mut);margin-top:6px}.live{color:#ff5a5a;font-weight:700}
 .sb{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-.tm{display:flex;align-items:center;gap:10px}.tm img{width:44px;height:44px}.tm .s{font-size:30px;font-weight:800}.mid{text-align:center;color:var(--mut)}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}.tm .s{font-size:24px}.tm img{width:32px;height:32px}}
-.pan{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}.tot{font-size:22px;font-weight:800;margin:2px 0 8px}.tot small{font-size:13px;color:var(--mut);font-weight:400}
-table{width:100%;border-collapse:collapse}th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
-th{color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;user-select:none}td.hit{color:var(--grn);font-weight:700}
+.tm{display:flex;align-items:center;gap:10px}.tm img{width:56px;height:56px}.tm .s{font-size:64px;font-weight:900;line-height:1}.mid{text-align:center;color:var(--mut);font-size:17px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}.tm .s{font-size:48px}.tm img{width:40px;height:40px}.mid{font-size:14px}td{font-size:20px!important}td:first-child{font-size:17px!important}}
+.pan{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}.tot{font-size:40px;font-weight:900;margin:2px 0 8px}.tot small{font-size:16px;color:var(--mut);font-weight:400}
+table{width:100%;border-collapse:collapse}th,td{padding:10px 6px;}td{font-size:24px;font-weight:700}td:first-child{font-size:18px;font-weight:600}th,td{border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-size:14px;font-weight:600;cursor:pointer;user-select:none}td.hit{color:var(--grn);font-weight:700}
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9}#gate input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;width:160px}
 .note{color:var(--mut);font-size:12px;margin:10px 4px}
 </style></head><body>
-<div id="gate"><form onsubmit="return unlock()"><input id="pw" type="password" inputmode="numeric" placeholder="Password" autofocus> <button>Open</button><div id="gerr" class="note"></div></form></div>
 <header><button id="back" hidden onclick="go(null)">‹ Games</button><h1>🏀 NBA Threes Tracker</h1><select id="team" title="Jump to team's game"></select></header>
 <main id="app"><div class="note">Loading…</div></main>
 <script>
 const H='37d2c05e6320b12b5d1cb3c43a154becd490688ff68ba9c79e95edc1e5534440',SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',SU='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=';
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function unlock(){if(await sha(document.getElementById('pw').value)===H){localStorage.nbaok=H;document.getElementById('gate').remove();start()}else document.getElementById('gerr').textContent='Wrong password';return false}
-if(localStorage.nbaok===H){document.getElementById('gate').remove();addEventListener('DOMContentLoaded',start)}
+addEventListener('DOMContentLoaded',start);
 const app=document.getElementById('app');let timer,events=[];
 const pt=d=>new Date(d).toLocaleString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',hour:'numeric',minute:'2-digit'})+' PT';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
