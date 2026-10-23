@@ -19,7 +19,7 @@ th{color:var(--mut);font-size:14px;font-weight:600;cursor:pointer;user-select:no
 #gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9}#gate input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:16px;width:160px}
 .note{color:var(--mut);font-size:12px;margin:10px 4px}
 </style></head><body>
-<header><button id="back" hidden onclick="go(null)">‹ Games</button><h1>🏀 NBA Threes Tracker</h1><select id="team" title="Jump to team's game"></select></header>
+<header><button id="back" hidden onclick="go(null)">‹ Games</button><h1>🏀 NBA Threes Tracker</h1><span id="upd" style="color:var(--mut);font-size:12px;white-space:nowrap"></span><select id="team" title="Jump to team's game"></select></header>
 <main id="app"><div class="note">Loading…</div></main>
 <script>
 const H='37d2c05e6320b12b5d1cb3c43a154becd490688ff68ba9c79e95edc1e5534440',SB='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',SU='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=';
@@ -32,6 +32,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 function params(){return new URLSearchParams(location.search)}
 function go(id){const u=new URL(location);u.search=id?'?game='+id:'';history.pushState(null,'',u);route()}
 addEventListener('popstate',route);
+function upd(){document.getElementById('upd').textContent='Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'2-digit',second:'2-digit'})}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)route()});addEventListener('focus',()=>route());
 async function j(u){const r=await fetch(u+(u.includes('?')?'&':'?')+'_='+Date.now());if(!r.ok)throw Error(r.status);return r.json()}
 async function start(){route()}
 async function loadSB(){const d=await j(SB);events=d.events||[];
@@ -50,7 +52,7 @@ async function listView(){try{await loadSB()}catch(e){}
  const L=events.filter(e=>e.status.type.state=='in'),U=events.filter(e=>e.status.type.state=='pre'),F=events.filter(e=>e.status.type.state=='post');
  let h='<h2>Live now ('+L.length+')</h2>'+(L.length?'<div class="grid">'+L.map(card).join('')+'</div>':'<div class="note">No games live right now.</div>');
  if(U.length)h+='<h2>Upcoming</h2><div class="grid">'+U.map(card).join('')+'</div>';if(F.length)h+='<h2>Final</h2><div class="grid">'+F.map(card).join('')+'</div>';
- app.innerHTML=h+'<div class="note">Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles'})+' PT · refreshes every 20s · data: ESPN</div>';timer=setTimeout(listView,20000)}
+ app.innerHTML=h+'<div class="note">Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles'})+' PT · refreshes every 15s · data: ESPN</div>';timer=setTimeout(listView,15000);upd()}
 function onCourt(d){// starters + substitution plays; per team
  const on={};(d.boxscore.players||[]).forEach(t=>{on[t.team.id]=new Set(t.statistics[0].athletes.filter(a=>a.starter).map(a=>a.athlete.id))});
  const plays=d.plays||[];let per=0;const seen={};
@@ -62,7 +64,7 @@ function onCourt(d){// starters + substitution plays; per team
  return on}
 function sortState(){return window._sort||{}}
 async function gameView(id){let d;try{d=await j(SU+id)}catch(e){app.innerHTML='<div class="note">Could not load game '+esc(id)+': '+e+'</div>';timer=setTimeout(()=>gameView(id),20000);return}
- if(params().get('game')!==id&&!params().get('team'))return;
+ if(params().get('game')!==id&&!params().get('team'))return;clearTimeout(timer);
  const comp=d.header.competitions[0],st=comp.status.type,state=st.state,cs=comp.competitors,a=cs.find(x=>x.homeAway=='away'),h=cs.find(x=>x.homeAway=='home');
  const box={};(d.boxscore.players||[]).forEach(t=>box[t.team.id]=t);const on=state=='in'?onCourt(d):null;
  const tmHTML=t=>'<div class="tm"><img src="'+(t.team.logos?t.team.logos[0].href:t.team.logo)+'" alt=""><div><div style="font-weight:700">'+esc(t.team.abbreviation)+'</div><div class="s">'+(state=='pre'?'–':t.score)+'</div></div></div>';
@@ -80,7 +82,7 @@ async function gameView(id){let d;try{d=await j(SU+id)}catch(e){app.innerHTML='<
   (rows.length?rows.map(r=>'<tr><td>'+esc(r.n)+(state=='pre'&&r.st?' ★':'')+'</td><td>'+esc(r.j)+'</td><td class="'+(r.m?'hit':'')+'">'+r.m+'</td><td>'+r.a+'</td><td>'+(r.p==null?'–':r.p.toFixed(1))+'</td></tr>').join(''):'<tr><td colspan="5" style="text-align:center;color:var(--mut)">'+(state=='pre'?'Lineups post near tip-off':'—')+'</td></tr>')+'</tbody></table></div>'}
  html+='</div><div class="note">Updated '+new Date().toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles'})+' PT · '+(state=='post'?'final':'refreshes every 15s')+' · on-court players derived from starters + ESPN substitution plays · data: ESPN</div>';
  const keep=[...app.querySelectorAll('table')].map(t=>{const th=t.querySelector('th[data-sdir]');return th?[th.cellIndex,th.dataset.sdir]:null});app.innerHTML=html;app.querySelectorAll('table').forEach((t,i)=>{const k=keep[i];if(!k)return;const th=t.rows[0].cells[k[0]];th.click();if(k[1]==='desc')th.click()});
- if(state!='post')timer=setTimeout(()=>gameView(id),15000)}
+ upd();if(state!='post')timer=setTimeout(()=>gameView(id),15000)}
 </script><!--SORTABLE-START--><script>
 /* Shared sortable tables (Grok Bot trackers). Click any header: asc/desc toggle with ▲/▼.
    Works on dynamically rendered tables via event delegation. Totals (tfoot, .total/.ft/.tot rows,
