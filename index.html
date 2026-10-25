@@ -59,7 +59,7 @@ async function loadOdds(e){const st=e.status.type.state,c=e.competitions[0],o=OD
 
 let FD=null,FDt=0;const nrm=x=>(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/[^a-z]/g,'');
 async function loadFD(){if(FD&&Date.now()-FDt<60000)return;try{FD=(await j('fanduel.json')).games||{};FDt=Date.now()}catch(_){if(!FD)FD={}}}
-function fdFor(a,h){if(!FD)return null;const g=FD[a.team.displayName+' @ '+h.team.displayName];if(!g||!Object.keys(g).length)return null;const m={};for(const k in g)m[nrm(k)]=g[k];return m}
+function fdFor(a,h){if(!FD)return null;const k=Object.keys(FD).find(k=>{const[x,y]=k.split(' @ ');return x.endsWith(a.team.name)&&y.endsWith(h.team.name)});const g=k&&FD[k];if(!g||!Object.keys(g).length)return null;const m={};for(const k in g)m[nrm(k)]=g[k];return m}
 function card(e){const c=e.competitions[0],st=e.status.type,a=c.competitors.find(x=>x.homeAway=='away'),h=c.competitors.find(x=>x.homeAway=='home');
  const row=t=>'<div class="tr"><img src="'+t.team.logo+'" alt=""><span class="n">'+esc(t.team.displayName)+'</span><span class="s">'+(st.state=='pre'?'':t.score)+'</span></div>';
  const s=st.state=='in'?'<span class="live">● LIVE</span> '+esc(st.detail):st.state=='pre'?'Tip '+pt(e.date):esc(st.detail);
