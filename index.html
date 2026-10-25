@@ -9,7 +9,7 @@ main{max-width:1100px;margin:auto;padding:14px}h2{font-size:13px;text-transform:
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .gc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.gc:hover{border-color:var(--acc)}
 .tr{display:flex;align-items:center;gap:8px;margin:4px 0}.tr img{width:34px;height:34px}.tr .n{flex:1;font-weight:600;font-size:17px}.tr .s{font-size:34px;font-weight:800}
-.st{font-size:12px;color:var(--mut);margin-top:6px}.live{color:#ff5a5a;font-weight:700}
+.st{font-size:12px;color:var(--mut);margin-top:6px}.live{color:#ff5a5a;font-weight:700}.od{font-size:13px;color:var(--tx);margin-top:4px}.od b{color:var(--grn)}
 .sb{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 .tm{display:flex;align-items:center;gap:10px}.tm img{width:56px;height:56px}.tm .s{font-size:64px;font-weight:900;line-height:1}.mid{text-align:center;color:var(--mut);font-size:17px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.cols{grid-template-columns:1fr}.tm .s{font-size:48px}.tm img{width:40px;height:40px}.mid{font-size:14px}td{font-size:20px!important}td:first-child{font-size:17px!important}}
@@ -44,11 +44,24 @@ async function route(){clearTimeout(timer);if(document.hidden)return;const p=par
  if(!events.length)try{await loadSB()}catch(e){app.innerHTML='<div class="note">Could not load scoreboard: '+e+'</div>';timer=setTimeout(route,20000);return}
  const tm=p.get('team');if(!id&&tm){const e=events.find(e=>e.competitions[0].competitors.some(c=>c.team.abbreviation.toUpperCase()===tm.toUpperCase()));if(e)id=e.id}
  document.getElementById('back').hidden=!id;id?gameView(id):listView()}
+
+const OD={};const fmtML=v=>v==null||v===''?'':(+v>0?'+':'')+v;
+function odHTML(e){const o=OD[e.id];if(!o)return '';const p=[];if(o.d)p.push(esc(o.d));if(o.ou)p.push('O/U '+o.ou);if(o.a!=null&&o.h!=null)p.push('ML '+fmtML(o.a)+' / '+fmtML(o.h));
+ return p.length?'<div class="od">'+(o.live?'<b>LIVE</b> ':'')+p.join(' · ')+' <span style="color:var(--mut)">('+esc(o.pv)+')</span></div>':''}
+async function loadOdds(e){const st=e.status.type.state,c=e.competitions[0],o=OD[e.id];
+ if(o&&Date.now()-o.t<(st=='in'?20000:120000))return;
+ const sb=(c.odds||[])[0];let r=null;
+ try{const d=await j('https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/'+e.id+'/competitions/'+c.id+'/odds');const it=d.items||[];
+  const lv=it.find(i=>/live/i.test(i.provider&&i.provider.name||'')),pre=it.find(i=>!/live/i.test(i.provider&&i.provider.name||''));const x=(st=='in'&&lv)?lv:(pre||lv);
+  if(x)r={d:x.details,ou:x.overUnder,a:x.awayTeamOdds&&x.awayTeamOdds.moneyLine,h:x.homeTeamOdds&&x.homeTeamOdds.moneyLine,pv:x.provider.name.replace(' - Live Odds',''),live:x===lv&&st=='in'}}catch(_){}
+ if(!r&&sb)r={d:sb.details,ou:sb.overUnder,pv:(sb.provider||{}).name||'',a:null,h:null};
+ if(r){r.t=Date.now();OD[e.id]=r}else if(o)o.t=Date.now();else OD[e.id]={t:Date.now()}}
 function card(e){const c=e.competitions[0],st=e.status.type,a=c.competitors.find(x=>x.homeAway=='away'),h=c.competitors.find(x=>x.homeAway=='home');
  const row=t=>'<div class="tr"><img src="'+t.team.logo+'" alt=""><span class="n">'+esc(t.team.displayName)+'</span><span class="s">'+(st.state=='pre'?'':t.score)+'</span></div>';
  const s=st.state=='in'?'<span class="live">● LIVE</span> '+esc(st.detail):st.state=='pre'?'Tip '+pt(e.date):esc(st.detail);
- return '<div class="gc" onclick="go(\''+e.id+'\')">'+row(a)+row(h)+'<div class="st">'+s+'</div></div>'}
+ return '<div class="gc" onclick="go(\''+e.id+'\')">'+row(a)+row(h)+'<div class="st">'+s+'</div>'+odHTML(e)+'</div>'}
 async function listView(){if(document.hidden)return;try{await loadSB()}catch(e){}
+ await Promise.all(events.filter(e=>e.status.type.state!='post').map(loadOdds));
  const L=events.filter(e=>e.status.type.state=='in'),U=events.filter(e=>e.status.type.state=='pre'),F=events.filter(e=>e.status.type.state=='post');
  let h='<h2>Live now ('+L.length+')</h2>'+(L.length?'<div class="grid">'+L.map(card).join('')+'</div>':'<div class="note">No games live right now.</div>');
  if(U.length)h+='<h2>Upcoming</h2><div class="grid">'+U.map(card).join('')+'</div>';if(F.length)h+='<h2>Final</h2><div class="grid">'+F.map(card).join('')+'</div>';
@@ -64,12 +77,12 @@ function onCourt(d){// starters + substitution plays; per team
  return on}
 function sortState(){return window._sort||{}}
 async function gameView(id){if(document.hidden)return;let d;try{d=await j(SU+id)}catch(e){app.innerHTML='<div class="note">Could not load game '+esc(id)+': '+e+'</div>';timer=setTimeout(()=>gameView(id),20000);return}
- if(params().get('game')!==id&&!params().get('team'))return;clearTimeout(timer);
+ {const ev=events.find(x=>x.id==id);if(ev)await loadOdds(ev).catch(()=>{})}if(params().get('game')!==id&&!params().get('team'))return;clearTimeout(timer);
  const comp=d.header.competitions[0],st=comp.status.type,state=st.state,cs=comp.competitors,a=cs.find(x=>x.homeAway=='away'),h=cs.find(x=>x.homeAway=='home');
  const box={};(d.boxscore.players||[]).forEach(t=>box[t.team.id]=t);const on=state=='in'?onCourt(d):null;
  const tmHTML=t=>'<div class="tm"><img src="'+(t.team.logos?t.team.logos[0].href:t.team.logo)+'" alt=""><div><div style="font-weight:700">'+esc(t.team.abbreviation)+'</div><div class="s">'+(state=='pre'?'–':t.score)+'</div></div></div>';
  const mid=state=='in'?'<span class="live">● LIVE</span><br>'+esc(st.detail):state=='pre'?'Tip-off<br>'+pt(comp.date):esc(st.detail);
- let html='<div class="sb">'+tmHTML(a)+'<div class="mid">'+mid+'</div>'+tmHTML(h)+'</div><div class="cols">';
+ let html='<div class="sb">'+tmHTML(a)+'<div class="mid">'+mid+'</div>'+tmHTML(h)+'</div>'+(()=>{const e=events.find(x=>x.id==id);return e?odHTML(e):''})()+'<div class="cols">';
  for(const t of [a,h]){const b=box[t.team.id];let rows=[],tm=0,ta=0;
   if(b){const s=b.statistics[0],i=s.names.indexOf('3PT'),mi=s.names.indexOf('MIN');
    for(const x of s.athletes){const v=(x.stats&&x.stats[i])||'0-0',[m,at]=v.split('-').map(Number);tm+=m||0;ta+=at||0;
