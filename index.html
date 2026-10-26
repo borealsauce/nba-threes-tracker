@@ -59,7 +59,7 @@ async function loadOdds(e){const st=e.status.type.state,c=e.competitions[0],o=OD
 
 let FD=null,FDt=0;const nrm=x=>(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/[^a-z]/g,'');
 async function loadFD(){if(FD&&Date.now()-FDt<60000)return;try{FD=(await j('fanduel.json')).games||{};FDt=Date.now()}catch(_){if(!FD)FD={}}}
-function fdFor(a,h){if(!FD)return null;const k=Object.keys(FD).find(k=>{const[x,y]=k.split(' @ ');return x.endsWith(a.team.name)&&y.endsWith(h.team.name)});const g=k&&FD[k];if(!g||!Object.keys(g).length)return null;const m={};for(const k in g)m[nrm(k)]=g[k];return m}
+function fdFor(a,h){if(!FD)return null;const k=Object.keys(FD).find(k=>{const[x,y]=k.split(' @ ');return x.endsWith(a.team.name)&&y.endsWith(h.team.name)});const g=k&&FD[k];if(!g)return null;if(!Object.keys(g).length)return {__none:1};const m={};for(const k in g)m[nrm(k)]=g[k];return m}
 function card(e){const c=e.competitions[0],st=e.status.type,a=c.competitors.find(x=>x.homeAway=='away'),h=c.competitors.find(x=>x.homeAway=='home');
  const row=t=>'<div class="tr"><img src="'+t.team.logo+'" alt=""><span class="n">'+esc(t.team.displayName)+'</span><span class="s">'+(st.state=='pre'?'':t.score)+'</span></div>';
  const s=st.state=='in'?'<span class="live">● LIVE</span> '+esc(st.detail):st.state=='pre'?'Tip '+pt(e.date):esc(st.detail);
@@ -92,7 +92,7 @@ async function gameView(id){if(document.hidden)return;let d;try{d=await j(SU+id)
    for(const x of s.athletes){const v=(x.stats&&x.stats[i])||'0-0',[m,at]=v.split('-').map(Number);tm+=m||0;ta+=at||0;
     const fk=nrm(x.athlete.displayName),inFD=true;const show=inFD&&(state=='in'?on[t.team.id].has(x.athlete.id):state=='post'?at>0:true);
     if(show)rows.push({rb:+((x.stats&&x.stats[ri])||0)||0,nf:!!fd&&fd[fk]==null,fl:fd&&fd[fk]!=null?fd[fk]:null,n:x.athlete.shortName||x.athlete.displayName,j:x.athlete.jersey||'',m:m||0,a:at||0,p:at?Math.round(m/at*1000)/10:null,st:x.starter})}}
-  const lbl=(fd?'Green = FanDuel 3PM line · <span style="color:#ff6b6b">red name = no FanDuel line</span> · ':'')+(state=='in'?'On court':state=='post'?'Players who shot threes':'Roster'+(rows.some(r=>r.st)?' (starters first)':''));
+  const lbl=(fd&&fd.__none?'<span style="color:#ff6b6b">FanDuel has no 3PM lines posted for this game · all names red</span> · ':fd?'Green = FanDuel 3PM line · <span style="color:#ff6b6b">red name = no FanDuel line</span> · ':'<span style="color:var(--mut)">FanDuel data not found for this game</span> · ')+(state=='in'?'On court':state=='post'?'Players who shot threes':'Roster'+(rows.some(r=>r.st)?' (starters first)':''));
   if(state=='pre')rows.sort((x,y)=>(y.st-x.st));
   html+='<div class="pan"><div style="font-weight:700">'+esc(t.team.displayName)+'</div><div class="tot">'+tm+'-'+ta+' <small>team 3PT'+(ta?' · '+(tm/ta*100).toFixed(1)+'%':'')+'</small></div>'+
   '<div class="note" style="margin:0 0 4px">'+lbl+'</div><table class="sortable"><thead><tr><th>Player</th><th>#</th><th>3PM</th><th>3PA</th><th>3P%</th><th>REB</th></tr></thead><tbody>'+
